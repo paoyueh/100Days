@@ -774,7 +774,7 @@
           📅 打卡日期
         </label>
         <input type="date" x-model="checkinDate" @change="onDateChange()" class="input-field"
-          style="font-size:1rem; padding:0.75rem 1rem; font-family:'Noto Sans TC',sans-serif;">
+          style="font-size:1rem; padding:0.75rem 1rem; font-family:'Noto Sans TC',sans-serif; width:100%; max-width:100%; box-sizing:border-box; display:block;">
         <!-- Conflict hint -->
         <template x-if="dateHasConflict">
           <p style="font-size:0.75rem; color:#e67e22; margin-top:0.4rem; font-weight:700; font-family:'Nunito',sans-serif;">
