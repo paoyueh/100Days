@@ -94,11 +94,6 @@
   /* ── Wallet stack ─────────────────────────────────────── */
   :root { --peek: 5.8rem; }
 
-  .wallet-stack {
-    padding: 0;
-    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
-  }
-
   .wallet-card {
     border-radius: var(--card-radius);
     position: relative;
@@ -335,12 +330,13 @@
     background: linear-gradient(160deg, #FDFFFE 0%, #F4F8F2 100%);
     border-radius: 2rem 2rem 0 0;
     border-top: 1.5px solid rgba(124,201,154,0.2);
-    width: 100%;
-    max-width: 480px;
-    max-height: 90vh;
+    width: 90%;
+    margin: 0 auto;
+    max-height: 92vh;
     overflow-y: auto;
     padding: 1.5rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom));
     animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 2rem 2rem 0 0;
   }
   @keyframes slideUp {
     from { transform: translateY(100%); opacity: 0; }
@@ -425,12 +421,11 @@
   /* ── FAB ─────────────────────────────────────────────────── */
   .fab {
     position: fixed;
-    bottom: calc(1.5rem + env(safe-area-inset-bottom));
-    right: 1.5rem;
+    bottom: calc(1.25rem + env(safe-area-inset-bottom));
+    right: 1.25rem;
     z-index: 50;
-    width: 56px; height: 56px;
+    width: 52px; height: 52px;
     border-radius: 50%;
-    /* Forest green instead of black */
     background: linear-gradient(135deg, #7CC99A 0%, #5BAD7A 100%);
     color: white;
     font-size: 1.5rem;
@@ -438,37 +433,29 @@
     box-shadow: 0 6px 20px rgba(91,173,122,0.40);
     display: flex; align-items: center; justify-content: center;
     transition: transform 0.2s ease;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 400;
+    line-height: 1;
   }
   .fab:active { transform: scale(0.9); }
 
-  /* ── Tab bar ─────────────────────────────────────────────── */
-  .tab-bar {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    background: rgba(244,248,242,0.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(124,201,154,0.18);
-    display: flex;
-    padding: 0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom));
-    z-index: 40;
-  }
-  .tab-item {
-    flex: 1;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 0.2rem;
-    padding: 0.4rem;
+  /* ── Tab bar: removed, replaced by header nav icon ── */
+
+  /* Nav icon in header top-right */
+  .nav-icon-btn {
+    background: rgba(91,173,122,0.12);
+    border: none;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
     cursor: pointer;
-    border: none; background: none;
-    font-family: 'Nunito', sans-serif;
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: rgba(91,173,122,0.45);
-    transition: color 0.2s;
+    font-size: 1.2rem;
+    line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, transform 0.15s;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
   }
-  .tab-item.active { color: var(--forest); }
-  .tab-icon { font-size: 1.3rem; }
+  .nav-icon-btn:active { transform: scale(0.9); background: rgba(91,173,122,0.22); }
 
   /* ── Settings list ────────────────────────────────────────── */
   .settings-item {
@@ -507,6 +494,12 @@
     padding: 1.5rem 0 0;
   }
 
+  /* Wallet stack bottom padding adjusted since no tab-bar */
+  .wallet-stack {
+    padding: 0;
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+  }
+
   /* ── Select ───────────────────────────────────────────────── */
   select.input-field {
     appearance: none;
@@ -536,8 +529,11 @@
         <p style="font-size:0.62rem; color:#8aaa96; font-family:'Nunito',sans-serif; font-weight:700; letter-spacing:0.08em; margin-bottom:0.15rem; text-transform:uppercase;">Today's Progress</p>
         <h1 style="font-size:1.55rem; font-weight:700; color:#2d4a38; line-height:1.1; font-family:'Fraunces',serif; font-style:italic;">100天挑戰 <span style="font-style:normal;">🌳</span></h1>
       </div>
-      <div style="background:rgba(91,173,122,0.12); border-radius:999px; padding:0.35rem 0.9rem; font-family:'Nunito',sans-serif; font-weight:800; font-size:0.8rem; color:var(--forest);">
-        <span x-text="todayStr()"></span>
+      <div style="display:flex; align-items:center; gap:0.4rem;">
+        <div style="background:rgba(91,173,122,0.12); border-radius:999px; padding:0.35rem 0.9rem; font-family:'Nunito',sans-serif; font-weight:800; font-size:0.8rem; color:var(--forest);">
+          <span x-text="todayStr()"></span>
+        </div>
+        <button class="nav-icon-btn" @click="tab = 'settings'" title="挑戰管理">⚙️</button>
       </div>
     </div>
   </div>
@@ -683,10 +679,15 @@
 <!-- Settings Page -->
 <div id="page-settings" class="page" :class="{ active: tab === 'settings' }">
   <div class="app-header">
-    <p style="font-size:0.62rem; color:#8aaa96; font-family:'Nunito',sans-serif; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;">Manage</p>
-    <h1 style="font-size:1.55rem; font-weight:700; color:#2d4a38; font-family:'Fraunces',serif; font-style:italic;">挑戰管理 <span style="font-style:normal;">⚙️</span></h1>
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <p style="font-size:0.62rem; color:#8aaa96; font-family:'Nunito',sans-serif; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;">Manage</p>
+        <h1 style="font-size:1.55rem; font-weight:700; color:#2d4a38; font-family:'Fraunces',serif; font-style:italic;">挑戰管理 <span style="font-style:normal;">⚙️</span></h1>
+      </div>
+      <button class="nav-icon-btn" @click="tab = 'home'" title="首頁">🏠</button>
+    </div>
   </div>
-  <div class="main-content" style="padding: 1rem 0 0;">
+  <div class="main-content" style="padding: 1rem 0 calc(4rem + env(safe-area-inset-bottom));">
     <template x-if="topics.length === 0">
       <div class="empty-state" style="width:90%; margin:0 auto;">
         <span class="emoji">📝</span>
@@ -733,22 +734,10 @@
   </div>
 </div>
 
-<!-- FAB -->
-<button class="fab" @click="tab === 'settings' ? openAddTopic() : openQuickCheckin()" x-show="tab !== 'settings' || true">
-  <span x-text="tab === 'settings' ? '＋' : '＋'"></span>
+<!-- FAB: quick checkin on home, add topic on settings -->
+<button class="fab" @click="tab === 'settings' ? openAddTopic() : openQuickCheckin()">
+  ＋
 </button>
-
-<!-- Tab Bar -->
-<div class="tab-bar">
-  <button class="tab-item" :class="{ active: tab === 'home' }" @click="tab = 'home'">
-    <span class="tab-icon">🏠</span>
-    <span>首頁</span>
-  </button>
-  <button class="tab-item" :class="{ active: tab === 'settings' }" @click="tab = 'settings'">
-    <span class="tab-icon">⚙️</span>
-    <span>管理</span>
-  </button>
-</div>
 
 <!-- ======= MODALS ======= -->
 
@@ -1646,12 +1635,33 @@ function app() {
     },
 
     exportData() {
-      const data = { topics: this.topics, logs: this.logs, exported: new Date().toISOString() };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `100day-backup-${this.todayISO()}.json`;
-      a.click(); URL.revokeObjectURL(url);
+      // 確保從 localStorage 讀取最新資料再匯出
+      const latestTopics = JSON.parse(localStorage.getItem('challenge_topics') || '[]');
+      const latestLogs   = JSON.parse(localStorage.getItem('challenge_logs')   || '[]');
+
+      const data = {
+        version: 2,
+        exported: new Date().toISOString(),
+        topics: latestTopics,
+        logs: latestLogs,
+        summary: {
+          topicCount: latestTopics.length,
+          logCount: latestLogs.length
+        }
+      };
+
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = `100day-backup-${this.todayISO()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert(`✅ 匯出成功！\n主題：${latestTopics.length} 個\n打卡紀錄：${latestLogs.length} 筆`);
     },
 
     importData(event) {
@@ -1661,21 +1671,43 @@ function app() {
       r.onload = (e) => {
         try {
           const data = JSON.parse(e.target.result);
-          if (data.topics && data.logs) {
-            this.confirmData = {
-              title: '匯入資料',
-              msg: `將覆蓋現有資料，匯入 ${data.topics.length} 個主題、${data.logs.length} 筆紀錄。確定嗎？`,
-              action: '匯入',
-              onConfirm: () => {
-                this.topics = data.topics;
-                this.logs = data.logs;
-                this.saveData();
-              },
-              onCancel: () => {}
-            };
-            this.modal = 'confirm';
-          } else { alert('檔案格式錯誤'); }
-        } catch(e) { alert('無法解析檔案'); }
+
+          // 支援新格式（含 version）與舊格式
+          const topics = data.topics || [];
+          const logs   = data.logs   || [];
+
+          if (!Array.isArray(topics)) {
+            alert('檔案格式錯誤：找不到有效的主題資料');
+            return;
+          }
+
+          const topicCount = topics.length;
+          const logCount   = logs.length;
+          const exportedAt = data.exported
+            ? new Date(data.exported).toLocaleString('zh-TW')
+            : '未知時間';
+
+          this.confirmData = {
+            title: '確認匯入資料',
+            msg: `備份時間：${exportedAt}\n主題：${topicCount} 個\n打卡紀錄：${logCount} 筆\n\n⚠️ 匯入後將完全覆蓋現有資料，此操作無法復原。`,
+            action: '確認匯入',
+            onConfirm: () => {
+              this.topics = topics;
+              this.logs   = logs;
+              this.saveData();
+              // 重整畫面狀態
+              this.expandedCard = null;
+              this.$nextTick(() => {
+                alert(`✅ 匯入成功！\n主題：${topicCount} 個\n打卡紀錄：${logCount} 筆`);
+              });
+            },
+            onCancel: () => {}
+          };
+          this.modal = 'confirm';
+
+        } catch(err) {
+          alert('❌ 無法解析檔案，請確認是正確的備份 JSON 格式');
+        }
       };
       r.readAsText(file);
       event.target.value = '';
