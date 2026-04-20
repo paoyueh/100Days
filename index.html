@@ -761,16 +761,24 @@
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem;">
         <div>
           <p style="font-size:0.7rem; color:#aaa; font-family:'Nunito',sans-serif; font-weight:700;" x-text="editingLog ? '編輯紀錄' : '打卡'"></p>
-          <!-- Quick checkin: show topic name as dropdown -->
+          <!-- Quick checkin: show topic as a proper styled dropdown -->
           <template x-if="isQuickCheckin && !editingLog">
-            <select
-              class="input-field"
-              style="font-size:1.1rem; font-weight:900; font-family:'Nunito',sans-serif; padding:0.3rem 2rem 0.3rem 0.5rem; border:none; background:transparent; color:#2d2d2d; width:auto; max-width:200px;"
-              @change="switchCheckinTopic($event.target.value)">
-              <template x-for="t in sortedTopics" :key="t.id">
-                <option :value="t.id" :selected="t.id === activeTopic?.id" x-text="t.name"></option>
-              </template>
-            </select>
+            <div style="position:relative; display:inline-block; max-width:220px;">
+              <select
+                style="font-size:1.15rem; font-weight:900; font-family:'Nunito',sans-serif;
+                       color:#2d4a38; background:rgba(91,173,122,0.1);
+                       border:2px solid rgba(91,173,122,0.3); border-radius:0.875rem;
+                       padding:0.35rem 2.2rem 0.35rem 0.75rem;
+                       -webkit-appearance:none; appearance:none;
+                       width:100%; cursor:pointer; outline:none;"
+                @change="switchCheckinTopic($event.target.value)">
+                <template x-for="t in sortedTopics" :key="t.id">
+                  <option :value="t.id" :selected="t.id === activeTopic?.id" x-text="t.name"></option>
+                </template>
+              </select>
+              <!-- Custom chevron -->
+              <span style="position:absolute; right:0.65rem; top:50%; transform:translateY(-50%); pointer-events:none; font-size:0.7rem; color:#5BAD7A;">▼</span>
+            </div>
           </template>
           <!-- Normal checkin: just show topic name -->
           <template x-if="!isQuickCheckin || editingLog">
@@ -1024,34 +1032,32 @@
 
 <!-- Photo Crop Modal -->
 <template x-if="modal === 'photocrop'">
-  <div class="modal-bg" style="align-items:center;">
-    <div style="background:white; border-radius:2rem; width:92%; max-width:480px; padding:1.25rem; animation: slideUp 0.3s ease;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h2 style="font-size:1rem; font-weight:900; font-family:'Nunito',sans-serif; color:#2d4a38;">裁切照片</h2>
-        <button @click="cancelCrop()" style="background:#f0f0f0; border:none; border-radius:50%; width:30px; height:30px; cursor:pointer;">✕</button>
-      </div>
-      <!-- Crop container -->
-      <div style="position:relative; width:100%; overflow:hidden; border-radius:1rem; background:#111;" :style="`aspect-ratio:1`">
+  <div style="position:fixed; inset:0; background:#000; z-index:200; display:flex; flex-direction:column;">
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; padding-top:calc(1rem + env(safe-area-inset-top)); background:rgba(0,0,0,0.7); flex-shrink:0;">
+      <button @click="cancelCrop()" style="background:rgba(255,255,255,0.15); color:white; border:none; border-radius:0.75rem; padding:0.5rem 1rem; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer;">取消</button>
+      <h2 style="font-size:1rem; font-weight:900; font-family:'Nunito',sans-serif; color:white;">裁切照片</h2>
+      <button @click="confirmCrop()" style="background:rgba(124,201,154,0.85); color:white; border:none; border-radius:0.75rem; padding:0.5rem 1rem; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer;">✅ 完成</button>
+    </div>
+    <!-- Crop area: square viewport -->
+    <div style="flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#111;">
+      <div id="crop-viewport"
+        style="position:relative; width:min(100vw, 100vh - 140px); height:min(100vw, 100vh - 140px); overflow:hidden; border-radius:0.5rem;"
+        @touchstart.prevent="cropTouchStart($event)"
+        @touchmove.prevent="cropTouchMove($event)"
+        @mousedown.prevent="cropMouseDown($event)">
         <img :src="cropSrc" id="crop-img"
-          style="position:absolute; transform-origin:center; user-select:none; touch-action:none;"
-          :style="`width:${cropScale*100}%; left:${cropX}px; top:${cropY}px; max-width:none;`"
-          @touchstart.prevent="cropTouchStart($event)"
-          @touchmove.prevent="cropTouchMove($event)"
-          @mousedown.prevent="cropMouseDown($event)">
-        <!-- Square crop overlay -->
-        <div style="position:absolute; inset:0; border: 3px solid rgba(255,255,255,0.9); border-radius:0.75rem; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); pointer-events:none;"></div>
-        <!-- Corner guides -->
-        <div style="position:absolute; top:8px; left:8px; width:20px; height:20px; border-top:3px solid white; border-left:3px solid white; border-radius:2px 0 0 0; pointer-events:none;"></div>
-        <div style="position:absolute; top:8px; right:8px; width:20px; height:20px; border-top:3px solid white; border-right:3px solid white; border-radius:0 2px 0 0; pointer-events:none;"></div>
-        <div style="position:absolute; bottom:8px; left:8px; width:20px; height:20px; border-bottom:3px solid white; border-left:3px solid white; border-radius:0 0 0 2px; pointer-events:none;"></div>
-        <div style="position:absolute; bottom:8px; right:8px; width:20px; height:20px; border-bottom:3px solid white; border-right:3px solid white; border-radius:0 0 2px 0; pointer-events:none;"></div>
-      </div>
-      <p style="font-size:0.72rem; color:#8aaa96; text-align:center; margin-top:0.6rem; font-family:'Nunito',sans-serif;">拖曳移動 · 雙指縮放</p>
-      <div style="display:flex; gap:0.75rem; margin-top:1rem;">
-        <button @click="cancelCrop()" style="flex:1; background:#f0f0f0; border:none; border-radius:1rem; padding:0.875rem; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer; color:#666;">取消</button>
-        <button @click="confirmCrop()" style="flex:1; background:linear-gradient(135deg,#7CC99A,#5BAD7A); color:white; border:none; border-radius:1rem; padding:0.875rem; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer;">✅ 確認裁切</button>
+          @load="initCropScale()"
+          style="position:absolute; touch-action:none; user-select:none; max-width:none; max-height:none;"
+          :style="`width:${cropImgW}px; height:${cropImgH}px; left:${cropX}px; top:${cropY}px;`">
+        <!-- Corner guides only, no dimming overlay since viewport IS the crop area -->
+        <div style="position:absolute; top:8px; left:8px; width:24px; height:24px; border-top:3px solid rgba(255,255,255,0.9); border-left:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:2px 0 0 0;"></div>
+        <div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-top:3px solid rgba(255,255,255,0.9); border-right:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:0 2px 0 0;"></div>
+        <div style="position:absolute; bottom:8px; left:8px; width:24px; height:24px; border-bottom:3px solid rgba(255,255,255,0.9); border-left:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:0 0 0 2px;"></div>
+        <div style="position:absolute; bottom:8px; right:8px; width:24px; height:24px; border-bottom:3px solid rgba(255,255,255,0.9); border-right:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:0 0 2px 0;"></div>
       </div>
     </div>
+    <p style="text-align:center; color:rgba(255,255,255,0.5); font-size:0.72rem; font-family:'Nunito',sans-serif; padding:0.6rem; padding-bottom:calc(0.6rem + env(safe-area-inset-bottom)); flex-shrink:0;">單指拖曳移動 · 雙指縮放</p>
   </div>
 </template>
 
@@ -1097,7 +1103,8 @@ function app() {
     // Photo crop state
     cropSrc: null,
     cropFieldId: null,
-    cropScale: 1,
+    cropImgW: 0,
+    cropImgH: 0,
     cropX: 0,
     cropY: 0,
     cropLastTouch: null,
@@ -1211,48 +1218,82 @@ function app() {
     initCropScale() {
       const img = document.getElementById('crop-img');
       if (!img) return;
-      const container = img.parentElement;
-      const cw = container.offsetWidth;
-      const ch = container.offsetHeight;
-      const nw = img.naturalWidth || img.width;
-      const nh = img.naturalHeight || img.height;
+      const vp = document.getElementById('crop-viewport');
+      if (!vp) return;
+      const vpSize = vp.offsetWidth; // square
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
       if (!nw || !nh) return;
-      // Scale so the image fills the crop square (cover)
-      const scale = Math.max(cw / nw, ch / nh);
-      this.cropScale = scale;
-      // Center
-      this.cropX = (cw - nw * scale) / 2;
-      this.cropY = (ch - nh * scale) / 2;
+      // Cover-fit: short side = vpSize
+      const scale = Math.max(vpSize / nw, vpSize / nh);
+      const iw = nw * scale;
+      const ih = nh * scale;
+      this.cropImgW = iw;
+      this.cropImgH = ih;
+      // Center image in viewport
+      this.cropX = (vpSize - iw) / 2;
+      this.cropY = (vpSize - ih) / 2;
     },
 
     cropTouchStart(e) {
       if (e.touches.length === 1) {
-        this.cropDragStart = { x: e.touches[0].clientX - this.cropX, y: e.touches[0].clientY - this.cropY, scale: this.cropScale, dist: null };
+        this.cropDragStart = {
+          tx: e.touches[0].clientX, ty: e.touches[0].clientY,
+          ix: this.cropX, iy: this.cropY,
+          dist: null, iw: this.cropImgW, ih: this.cropImgH
+        };
       } else if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
-        this.cropDragStart = { x: this.cropX, y: this.cropY, scale: this.cropScale, dist: Math.hypot(dx, dy) };
+        this.cropDragStart = {
+          tx: 0, ty: 0, ix: this.cropX, iy: this.cropY,
+          dist: Math.hypot(dx, dy), iw: this.cropImgW, ih: this.cropImgH
+        };
       }
     },
 
     cropTouchMove(e) {
       if (!this.cropDragStart) return;
+      const vp = document.getElementById('crop-viewport');
+      const vpSize = vp ? vp.offsetWidth : 300;
+
       if (e.touches.length === 1 && this.cropDragStart.dist === null) {
-        this.cropX = e.touches[0].clientX - this.cropDragStart.x;
-        this.cropY = e.touches[0].clientY - this.cropDragStart.y;
+        const dx = e.touches[0].clientX - this.cropDragStart.tx;
+        const dy = e.touches[0].clientY - this.cropDragStart.ty;
+        this.cropX = this.clampCropX(this.cropDragStart.ix + dx, this.cropImgW, vpSize);
+        this.cropY = this.clampCropY(this.cropDragStart.iy + dy, this.cropImgH, vpSize);
       } else if (e.touches.length === 2 && this.cropDragStart.dist) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const newDist = Math.hypot(dx, dy);
         const ratio = newDist / this.cropDragStart.dist;
-        this.cropScale = Math.max(0.5, Math.min(4, this.cropDragStart.scale * ratio));
+        const minScale = Math.max(vpSize / (this.cropDragStart.iw / (this.cropDragStart.iw / vpSize)),
+                                  vpSize / (this.cropDragStart.ih / (this.cropDragStart.ih / vpSize)));
+        const newW = Math.max(vpSize, this.cropDragStart.iw * ratio);
+        const newH = Math.max(vpSize, this.cropDragStart.ih * ratio);
+        this.cropImgW = newW;
+        this.cropImgH = newH;
+        this.cropX = this.clampCropX(this.cropDragStart.ix, newW, vpSize);
+        this.cropY = this.clampCropY(this.cropDragStart.iy, newH, vpSize);
       }
+    },
+
+    clampCropX(x, imgW, vpSize) {
+      return Math.min(0, Math.max(vpSize - imgW, x));
+    },
+    clampCropY(y, imgH, vpSize) {
+      return Math.min(0, Math.max(vpSize - imgH, y));
     },
 
     cropMouseDown(e) {
       const startX = e.clientX - this.cropX;
       const startY = e.clientY - this.cropY;
-      const onMove = (ev) => { this.cropX = ev.clientX - startX; this.cropY = ev.clientY - startY; };
+      const vp = document.getElementById('crop-viewport');
+      const vpSize = vp ? vp.offsetWidth : 300;
+      const onMove = (ev) => {
+        this.cropX = this.clampCropX(ev.clientX - startX, this.cropImgW, vpSize);
+        this.cropY = this.clampCropY(ev.clientY - startY, this.cropImgH, vpSize);
+      };
       const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
@@ -1260,27 +1301,31 @@ function app() {
 
     confirmCrop() {
       const img = document.getElementById('crop-img');
-      if (!img) return;
-      const container = img.parentElement;
-      const cw = container.offsetWidth;
-      const ch = container.offsetHeight; // square
+      const vp  = document.getElementById('crop-viewport');
+      if (!img || !vp) return;
+
+      const vpSize = vp.offsetWidth;   // square viewport size in CSS px
       const nw = img.naturalWidth;
       const nh = img.naturalHeight;
 
-      // Map container coords back to image coords
-      const scaleX = nw / (nw * this.cropScale);
-      const scaleY = nh / (nh * this.cropScale);
+      // cropX/cropY are the img's CSS px offset within the viewport
+      // cropImgW/H are the img's CSS px rendered dimensions
+      // We need to map viewport square (0,0,vpSize,vpSize) back to source image coords
+      const scaleX = nw / this.cropImgW;  // source px per CSS px
+      const scaleY = nh / this.cropImgH;
+
       const sx = (-this.cropX) * scaleX;
       const sy = (-this.cropY) * scaleY;
-      const sSize = cw * scaleX; // crop square size in source pixels
+      const sw = vpSize * scaleX;
+      const sh = vpSize * scaleY;
 
+      const OUT = 600;
       const canvas = document.createElement('canvas');
-      const OUT = 600; // 600×600 output for iPhone clarity
       canvas.width = OUT; canvas.height = OUT;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, sx, sy, sSize, sSize, 0, 0, OUT, OUT);
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, OUT, OUT);
 
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       this.checkinData[this.cropFieldId] = dataUrl;
       this.modal = this.cropPrevModal;
       this.cropSrc = null;
@@ -1507,7 +1552,7 @@ function app() {
       const textColor = photo ? 'color:white; position:relative; z-index:1;' : '';
       return `
         ${photo ? `<div style="${overlayStyle}"></div>` : ''}
-        <span class="cell-day" style="${textColor}">${n}</span>${valLine}
+        <span class="cell-day" style="${textColor}">${n}</span>${valLine.replace('class="cell-val"', `class="cell-val" style="position:relative;z-index:1;${photo ? 'color:white;' : ''}"`)  }
       `;
     },
 
