@@ -1042,15 +1042,12 @@
     <!-- Crop area: square viewport -->
     <div style="flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#111;">
       <div id="crop-viewport"
-        style="position:relative; width:min(100vw, 100vh - 140px); height:min(100vw, 100vh - 140px); overflow:hidden; border-radius:0.5rem;"
-        @touchstart.prevent="cropTouchStart($event)"
-        @touchmove.prevent="cropTouchMove($event)"
-        @mousedown.prevent="cropMouseDown($event)">
+        style="position:relative; width:min(100vw, 100vh - 140px); height:min(100vw, 100vh - 140px); overflow:hidden; border-radius:0.5rem;">
         <img :src="cropSrc" id="crop-img"
           @load="initCropScale()"
           style="position:absolute; touch-action:none; user-select:none; max-width:none; max-height:none;"
           :style="`width:${cropImgW}px; height:${cropImgH}px; left:${cropX}px; top:${cropY}px;`">
-        <!-- Corner guides only, no dimming overlay since viewport IS the crop area -->
+        <!-- Corner guides -->
         <div style="position:absolute; top:8px; left:8px; width:24px; height:24px; border-top:3px solid rgba(255,255,255,0.9); border-left:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:2px 0 0 0;"></div>
         <div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-top:3px solid rgba(255,255,255,0.9); border-right:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:0 2px 0 0;"></div>
         <div style="position:absolute; bottom:8px; left:8px; width:24px; height:24px; border-bottom:3px solid rgba(255,255,255,0.9); border-left:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:0 0 0 2px;"></div>
@@ -1279,9 +1276,17 @@ function app() {
     },
 
     clampCropX(x, imgW, vpSize) {
+      if (imgW <= vpSize) {
+        // image smaller than viewport: allow free movement within viewport bounds
+        return Math.min(0, Math.max(vpSize - imgW, x));
+      }
+      // image larger than viewport: keep it covering the viewport
       return Math.min(0, Math.max(vpSize - imgW, x));
     },
     clampCropY(y, imgH, vpSize) {
+      if (imgH <= vpSize) {
+        return Math.min(0, Math.max(vpSize - imgH, y));
+      }
       return Math.min(0, Math.max(vpSize - imgH, y));
     },
 
@@ -1519,12 +1524,13 @@ function app() {
       if (isFocus) {
         const rows = textFields.map(f => {
           const v = log.data[f.id];
+          const wc = photo ? 'color:white;' : '';
           if (f.type === 'star') {
             const stars = parseInt(v) || 0;
-            return `<div class="focus-row focus-star" style="position:relative;z-index:1;">${'⭐'.repeat(stars)}</div>`;
+            return `<div class="focus-row focus-star" style="position:relative;z-index:1;${wc}">${'⭐'.repeat(stars)}</div>`;
           }
           const display = (v || '-') + (f.unit && f.type === 'number' ? ' ' + f.unit : '');
-          return `<div class="focus-row" style="position:relative;z-index:1;">${display}</div>`;
+          return `<div class="focus-row" style="position:relative;z-index:1;${wc}">${display}</div>`;
         }).join('');
         const dateDisp = log.date.replace(/^\d{4}-/, '').replace('-', '/');
         const textColor = photo ? 'color:white;' : '';
