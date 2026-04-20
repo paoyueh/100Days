@@ -225,7 +225,7 @@
     cursor: pointer;
     transition: transform 0.15s ease;
     position: relative;
-    overflow: visible;
+    overflow: hidden;
     padding: 2px;
     box-sizing: border-box;
   }
@@ -669,6 +669,7 @@
                   <div
                     :class="getCellClass(topic, n)"
                     :id="`cell-${topic.id}-${n}`"
+                    :style="getCellPhotoStyle(topic, n)"
                     @click.stop="cellClick(topic, n)"
                     x-html="getCellContent(topic, n)"
                   ></div>
@@ -839,6 +840,30 @@
               </template>
             </div>
           </template>
+
+          <!-- Photo -->
+          <template x-if="field.type === 'photo'">
+            <div>
+              <!-- Preview if already has photo -->
+              <template x-if="checkinData[field.id]">
+                <div style="position:relative; margin-bottom:0.6rem;">
+                  <img :src="checkinData[field.id]" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:1rem; display:block;">
+                  <button @click="checkinData[field.id] = null" style="position:absolute; top:0.4rem; right:0.4rem; background:rgba(0,0,0,0.55); color:white; border:none; border-radius:50%; width:28px; height:28px; cursor:pointer; font-size:0.9rem; display:flex; align-items:center; justify-content:center;">✕</button>
+                </div>
+              </template>
+              <!-- Upload buttons -->
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                <label style="background:rgba(91,173,122,0.1); border:2px dashed rgba(91,173,122,0.35); border-radius:1rem; padding:0.75rem; text-align:center; cursor:pointer; font-size:0.8rem; font-weight:700; font-family:'Nunito',sans-serif; color:var(--forest);">
+                  🖼 從相簿選取
+                  <input type="file" accept="image/*" style="display:none;" @change="handlePhotoSelect($event, field.id)">
+                </label>
+                <label style="background:rgba(91,173,122,0.1); border:2px dashed rgba(91,173,122,0.35); border-radius:1rem; padding:0.75rem; text-align:center; cursor:pointer; font-size:0.8rem; font-weight:700; font-family:'Nunito',sans-serif; color:var(--forest);">
+                  📷 拍照
+                  <input type="file" accept="image/*" capture="environment" style="display:none;" @change="handlePhotoSelect($event, field.id)">
+                </label>
+              </div>
+            </div>
+          </template>
         </div>
       </template>
 
@@ -889,6 +914,7 @@
                 <option value="text">文字</option>
                 <option value="select">單選</option>
                 <option value="star">星評</option>
+                <option value="photo" :disabled="editingTopic.fields.filter(f=>f.type==='photo').length > 1 || (field.type !== 'photo' && editingTopic.fields.some(f=>f.type==='photo' && f.id !== field.id))">📷 照片</option>
               </select>
             </div>
             <template x-if="field.type === 'number'">
@@ -958,16 +984,31 @@
       </div>
 
       <template x-for="field in getFields(activeTopic)" :key="field.id">
-        <div style="background:#f8f8f8; border-radius:1rem; padding:0.75rem 1rem; margin-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:0.85rem; color:#666; font-weight:600;" x-text="field.name"></span>
-          <span style="font-weight:800; font-family:'Nunito',sans-serif;">
-            <template x-if="field.type === 'star'">
-              <span x-text="'⭐'.repeat(viewingLog?.data[field.id] || 0)"></span>
-            </template>
-            <template x-if="field.type !== 'star'">
-              <span x-text="(viewingLog?.data[field.id] || '-') + (field.unit && field.type==='number' ? ' '+field.unit : '')"></span>
-            </template>
-          </span>
+        <div style="background:#f8f8f8; border-radius:1rem; padding:0.75rem 1rem; margin-bottom:0.5rem;">
+          <template x-if="field.type === 'photo'">
+            <div>
+              <p style="font-size:0.8rem; color:#666; font-weight:600; margin-bottom:0.5rem;" x-text="field.name"></p>
+              <template x-if="viewingLog?.data[field.id]">
+                <img :src="viewingLog?.data[field.id]" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:0.75rem; display:block;">
+              </template>
+              <template x-if="!viewingLog?.data[field.id]">
+                <p style="font-size:0.85rem; color:#aaa;">無照片</p>
+              </template>
+            </div>
+          </template>
+          <template x-if="field.type !== 'photo'">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.85rem; color:#666; font-weight:600;" x-text="field.name"></span>
+              <span style="font-weight:800; font-family:'Nunito',sans-serif;">
+                <template x-if="field.type === 'star'">
+                  <span x-text="'⭐'.repeat(viewingLog?.data[field.id] || 0)"></span>
+                </template>
+                <template x-if="field.type !== 'star'">
+                  <span x-text="(viewingLog?.data[field.id] || '-') + (field.unit && field.type==='number' ? ' '+field.unit : '')"></span>
+                </template>
+              </span>
+            </div>
+          </template>
         </div>
       </template>
 
@@ -977,6 +1018,39 @@
         <button class="btn-success" @click="editViewingLog()" style="flex:1;">✏️ 編輯</button>
       </div>
       <button class="btn-ghost" @click="closeModal()">關閉</button>
+    </div>
+  </div>
+</template>
+
+<!-- Photo Crop Modal -->
+<template x-if="modal === 'photocrop'">
+  <div class="modal-bg" style="align-items:center;">
+    <div style="background:white; border-radius:2rem; width:92%; max-width:480px; padding:1.25rem; animation: slideUp 0.3s ease;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h2 style="font-size:1rem; font-weight:900; font-family:'Nunito',sans-serif; color:#2d4a38;">裁切照片</h2>
+        <button @click="cancelCrop()" style="background:#f0f0f0; border:none; border-radius:50%; width:30px; height:30px; cursor:pointer;">✕</button>
+      </div>
+      <!-- Crop container -->
+      <div style="position:relative; width:100%; overflow:hidden; border-radius:1rem; background:#111;" :style="`aspect-ratio:1`">
+        <img :src="cropSrc" id="crop-img"
+          style="position:absolute; transform-origin:center; user-select:none; touch-action:none;"
+          :style="`width:${cropScale*100}%; left:${cropX}px; top:${cropY}px; max-width:none;`"
+          @touchstart.prevent="cropTouchStart($event)"
+          @touchmove.prevent="cropTouchMove($event)"
+          @mousedown.prevent="cropMouseDown($event)">
+        <!-- Square crop overlay -->
+        <div style="position:absolute; inset:0; border: 3px solid rgba(255,255,255,0.9); border-radius:0.75rem; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); pointer-events:none;"></div>
+        <!-- Corner guides -->
+        <div style="position:absolute; top:8px; left:8px; width:20px; height:20px; border-top:3px solid white; border-left:3px solid white; border-radius:2px 0 0 0; pointer-events:none;"></div>
+        <div style="position:absolute; top:8px; right:8px; width:20px; height:20px; border-top:3px solid white; border-right:3px solid white; border-radius:0 2px 0 0; pointer-events:none;"></div>
+        <div style="position:absolute; bottom:8px; left:8px; width:20px; height:20px; border-bottom:3px solid white; border-left:3px solid white; border-radius:0 0 0 2px; pointer-events:none;"></div>
+        <div style="position:absolute; bottom:8px; right:8px; width:20px; height:20px; border-bottom:3px solid white; border-right:3px solid white; border-radius:0 0 2px 0; pointer-events:none;"></div>
+      </div>
+      <p style="font-size:0.72rem; color:#8aaa96; text-align:center; margin-top:0.6rem; font-family:'Nunito',sans-serif;">拖曳移動 · 雙指縮放</p>
+      <div style="display:flex; gap:0.75rem; margin-top:1rem;">
+        <button @click="cancelCrop()" style="flex:1; background:#f0f0f0; border:none; border-radius:1rem; padding:0.875rem; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer; color:#666;">取消</button>
+        <button @click="confirmCrop()" style="flex:1; background:linear-gradient(135deg,#7CC99A,#5BAD7A); color:white; border:none; border-radius:1rem; padding:0.875rem; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer;">✅ 確認裁切</button>
+      </div>
     </div>
   </div>
 </template>
@@ -1020,6 +1094,15 @@ function app() {
     dragMoved: false,
     dragLongPressTimer: null,
     dragActive: false,
+    // Photo crop state
+    cropSrc: null,
+    cropFieldId: null,
+    cropScale: 1,
+    cropX: 0,
+    cropY: 0,
+    cropLastTouch: null,
+    cropDragStart: null,
+    cropPrevModal: 'checkin',
 
     init() {
       this.loadData();
@@ -1103,7 +1186,123 @@ function app() {
       return `${v}${f.unit ? ' '+f.unit : ''}`;
     },
 
-    // ── Drag to reorder ──────────────────────────────────────────
+    // ── Photo handling ────────────────────────────────────────
+    handlePhotoSelect(event, fieldId) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.cropSrc = e.target.result;
+        this.cropFieldId = fieldId;
+        this.cropScale = 1;
+        this.cropX = 0;
+        this.cropY = 0;
+        this.cropPrevModal = 'checkin';
+        this.modal = 'photocrop';
+        // Init scale after image loads
+        this.$nextTick(() => {
+          setTimeout(() => this.initCropScale(), 80);
+        });
+      };
+      reader.readAsDataURL(file);
+      event.target.value = '';
+    },
+
+    initCropScale() {
+      const img = document.getElementById('crop-img');
+      if (!img) return;
+      const container = img.parentElement;
+      const cw = container.offsetWidth;
+      const ch = container.offsetHeight;
+      const nw = img.naturalWidth || img.width;
+      const nh = img.naturalHeight || img.height;
+      if (!nw || !nh) return;
+      // Scale so the image fills the crop square (cover)
+      const scale = Math.max(cw / nw, ch / nh);
+      this.cropScale = scale;
+      // Center
+      this.cropX = (cw - nw * scale) / 2;
+      this.cropY = (ch - nh * scale) / 2;
+    },
+
+    cropTouchStart(e) {
+      if (e.touches.length === 1) {
+        this.cropDragStart = { x: e.touches[0].clientX - this.cropX, y: e.touches[0].clientY - this.cropY, scale: this.cropScale, dist: null };
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        this.cropDragStart = { x: this.cropX, y: this.cropY, scale: this.cropScale, dist: Math.hypot(dx, dy) };
+      }
+    },
+
+    cropTouchMove(e) {
+      if (!this.cropDragStart) return;
+      if (e.touches.length === 1 && this.cropDragStart.dist === null) {
+        this.cropX = e.touches[0].clientX - this.cropDragStart.x;
+        this.cropY = e.touches[0].clientY - this.cropDragStart.y;
+      } else if (e.touches.length === 2 && this.cropDragStart.dist) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const newDist = Math.hypot(dx, dy);
+        const ratio = newDist / this.cropDragStart.dist;
+        this.cropScale = Math.max(0.5, Math.min(4, this.cropDragStart.scale * ratio));
+      }
+    },
+
+    cropMouseDown(e) {
+      const startX = e.clientX - this.cropX;
+      const startY = e.clientY - this.cropY;
+      const onMove = (ev) => { this.cropX = ev.clientX - startX; this.cropY = ev.clientY - startY; };
+      const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+
+    confirmCrop() {
+      const img = document.getElementById('crop-img');
+      if (!img) return;
+      const container = img.parentElement;
+      const cw = container.offsetWidth;
+      const ch = container.offsetHeight; // square
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+
+      // Map container coords back to image coords
+      const scaleX = nw / (nw * this.cropScale);
+      const scaleY = nh / (nh * this.cropScale);
+      const sx = (-this.cropX) * scaleX;
+      const sy = (-this.cropY) * scaleY;
+      const sSize = cw * scaleX; // crop square size in source pixels
+
+      const canvas = document.createElement('canvas');
+      const OUT = 600; // 600×600 output for iPhone clarity
+      canvas.width = OUT; canvas.height = OUT;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, sx, sy, sSize, sSize, 0, 0, OUT, OUT);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      this.checkinData[this.cropFieldId] = dataUrl;
+      this.modal = this.cropPrevModal;
+      this.cropSrc = null;
+      this.cropFieldId = null;
+    },
+
+    cancelCrop() {
+      this.modal = this.cropPrevModal;
+      this.cropSrc = null;
+      this.cropFieldId = null;
+    },
+
+    // Get photo field value from a log for a topic
+    getPhotoFromLog(topic, log) {
+      if (!log) return null;
+      const fields = this.getFields(topic);
+      const photoField = fields.find(f => f.type === 'photo');
+      if (!photoField) return null;
+      return log.data[photoField.id] || null;
+    },
+
+    // ── Drag handling ────────────────────────────────────────
     dragStart(e, topicId) {
       if (this.expandedCard) return; // no drag when a card is open
       this.dragMoved = false;
@@ -1242,6 +1441,11 @@ function app() {
       if (isFocus) cls += ' filled focus-cell';
       else if (isFilled) cls += ' filled';
       else cls += ' empty';
+      // Photo background support
+      if (isFilled) {
+        const photo = this.getPhotoFromLog(topic, logs[n-1]);
+        if (photo) cls += ' has-photo';
+      }
       return cls;
     },
 
@@ -1250,46 +1454,61 @@ function app() {
       const isFilled = n <= logs.length;
       const isFocus = n === logs.length && logs.length > 0;
       const fields = this.getFields(topic);
+      // Non-photo fields only for text display
+      const textFields = fields.filter(f => f.type !== 'photo');
 
       if (!isFilled) {
         return `<span class="cell-day">${n}</span>`;
       }
 
       const log = logs[n - 1];
+      const photo = this.getPhotoFromLog(topic, log);
+      const photoStyle = photo
+        ? `background-image:url('${photo}'); background-size:cover; background-position:center;`
+        : '';
+      const overlayOpacity = isFocus ? 0.45 : 0.62; // photo tint overlay
+      const overlayStyle = photo
+        ? `position:absolute; inset:0; background:rgba(0,0,0,${overlayOpacity}); border-radius:inherit; z-index:0;`
+        : '';
 
       if (isFocus) {
-        // Focus cell: day label + date big + each field value (no field name)
-        const rows = fields.map(f => {
+        const rows = textFields.map(f => {
           const v = log.data[f.id];
           if (f.type === 'star') {
             const stars = parseInt(v) || 0;
-            return `<div class="focus-row focus-star">${'⭐'.repeat(stars)}</div>`;
+            return `<div class="focus-row focus-star" style="position:relative;z-index:1;">${'⭐'.repeat(stars)}</div>`;
           }
           const display = (v || '-') + (f.unit && f.type === 'number' ? ' ' + f.unit : '');
-          return `<div class="focus-row">${display}</div>`;
+          return `<div class="focus-row" style="position:relative;z-index:1;">${display}</div>`;
         }).join('');
         const dateDisp = log.date.replace(/^\d{4}-/, '').replace('-', '/');
+        const textColor = photo ? 'color:white;' : '';
         return `
-          <div class="focus-day">DAY ${n}</div>
-          <div class="focus-date">${dateDisp}</div>
+          ${photo ? `<div style="${overlayStyle}"></div>` : ''}
+          <div class="focus-day" style="position:relative;z-index:1;${textColor}">DAY ${n}</div>
+          <div class="focus-date" style="position:relative;z-index:1;${textColor}">${dateDisp}</div>
           ${rows}
         `;
       }
 
-      // Normal filled cell: day number + first field value (no name)
+      // Normal filled cell
       let valLine = '';
-      if (fields.length > 0) {
-        const f = fields[0];
+      if (textFields.length > 0) {
+        const f = textFields[0];
         const v = log.data[f.id];
         if (f.type === 'star') {
           const stars = parseInt(v) || 0;
-          valLine = `<div class="cell-val">${'★'.repeat(stars)}</div>`;
+          valLine = `<div class="cell-val" style="position:relative;z-index:1;">${'★'.repeat(stars)}</div>`;
         } else {
           const display = (v !== undefined && v !== '' ? v : '') + (f.unit && f.type === 'number' ? f.unit : '');
-          valLine = display ? `<div class="cell-val">${display}</div>` : '';
+          valLine = display ? `<div class="cell-val" style="position:relative;z-index:1;">${display}</div>` : '';
         }
       }
-      return `<span class="cell-day">${n}</span>${valLine}`;
+      const textColor = photo ? 'color:white; position:relative; z-index:1;' : '';
+      return `
+        ${photo ? `<div style="${overlayStyle}"></div>` : ''}
+        <span class="cell-day" style="${textColor}">${n}</span>${valLine}
+      `;
     },
 
     cellClick(topic, n) {
@@ -1348,10 +1567,22 @@ function app() {
       this.openCheckin(this.sortedTopics[0]);
     },
 
+    getCellPhotoStyle(topic, n) {
+      const logs = this.getTopicLogs(topic.id);
+      if (n > logs.length) return '';
+      const log = logs[n - 1];
+      const photo = this.getPhotoFromLog(topic, log);
+      if (!photo) return '';
+      const isFocus = n === logs.length && logs.length > 0;
+      // Focus cell: lighter tint (photo more visible), normal cell: darker tint
+      return `background-image: url('${photo}'); background-size: cover; background-position: center;`;
+    },
+
     saveCheckin() {
       const fields = this.getFields(this.activeTopic);
-      // Validate all fields
+      // Validate all fields — photo fields are optional
       for (const f of fields) {
+        if (f.type === 'photo') continue; // photo not required
         if (!this.checkinData[f.id] && this.checkinData[f.id] !== 0) {
           alert(`請填寫「${f.name}」欄位`);
           return;
