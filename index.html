@@ -1032,29 +1032,16 @@
 
 <!-- Photo Crop Modal -->
 <template x-if="modal === 'photocrop'">
-  <div style="position:fixed; inset:0; background:#000; z-index:200; display:flex; flex-direction:column;">
-    <!-- Header -->
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; padding-top:calc(1rem + env(safe-area-inset-top)); background:rgba(0,0,0,0.7); flex-shrink:0;">
+  <div style="position:fixed; inset:0; background:#111; z-index:200; display:flex; flex-direction:column;">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; padding-top:calc(1rem + env(safe-area-inset-top)); flex-shrink:0;">
       <button @click="cancelCrop()" style="background:rgba(255,255,255,0.15); color:white; border:none; border-radius:0.75rem; padding:0.5rem 1rem; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer;">取消</button>
       <h2 style="font-size:1rem; font-weight:900; font-family:'Nunito',sans-serif; color:white;">裁切照片</h2>
       <button @click="confirmCrop()" style="background:rgba(124,201,154,0.85); color:white; border:none; border-radius:0.75rem; padding:0.5rem 1rem; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer;">✅ 完成</button>
     </div>
-    <!-- Crop area: square viewport -->
-    <div style="flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#111;">
-      <div id="crop-viewport"
-        style="position:relative; width:min(100vw, 100vh - 140px); height:min(100vw, 100vh - 140px); overflow:hidden; border-radius:0.5rem;">
-        <img :src="cropSrc" id="crop-img"
-          @load="initCropScale()"
-          style="position:absolute; touch-action:none; user-select:none; max-width:none; max-height:none;"
-          :style="`width:${cropImgW}px; height:${cropImgH}px; left:${cropX}px; top:${cropY}px;`">
-        <!-- Corner guides -->
-        <div style="position:absolute; top:8px; left:8px; width:24px; height:24px; border-top:3px solid rgba(255,255,255,0.9); border-left:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:2px 0 0 0;"></div>
-        <div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-top:3px solid rgba(255,255,255,0.9); border-right:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:0 2px 0 0;"></div>
-        <div style="position:absolute; bottom:8px; left:8px; width:24px; height:24px; border-bottom:3px solid rgba(255,255,255,0.9); border-left:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:0 0 0 2px;"></div>
-        <div style="position:absolute; bottom:8px; right:8px; width:24px; height:24px; border-bottom:3px solid rgba(255,255,255,0.9); border-right:3px solid rgba(255,255,255,0.9); pointer-events:none; border-radius:0 0 2px 0;"></div>
-      </div>
+    <div style="flex:1; display:flex; align-items:center; justify-content:center;">
+      <canvas id="crop-canvas" style="display:block; touch-action:none;"></canvas>
     </div>
-    <p style="text-align:center; color:rgba(255,255,255,0.5); font-size:0.72rem; font-family:'Nunito',sans-serif; padding:0.6rem; padding-bottom:calc(0.6rem + env(safe-area-inset-bottom)); flex-shrink:0;">單指拖曳移動 · 雙指縮放</p>
+    <p style="text-align:center; color:rgba(255,255,255,0.4); font-size:0.72rem; font-family:'Nunito',sans-serif; padding:0.5rem; padding-bottom:calc(0.5rem + env(safe-area-inset-bottom)); flex-shrink:0;">單指移動 · 雙指縮放</p>
   </div>
 </template>
 
@@ -1198,146 +1185,210 @@ function app() {
       reader.onload = (e) => {
         this.cropSrc = e.target.result;
         this.cropFieldId = fieldId;
-        this.cropScale = 1;
+        this.cropImgW = 0;
+        this.cropImgH = 0;
         this.cropX = 0;
         this.cropY = 0;
         this.cropPrevModal = 'checkin';
         this.modal = 'photocrop';
-        // Init scale after image loads
-        this.$nextTick(() => {
-          setTimeout(() => this.initCropScale(), 80);
-        });
+        // Init canvas after modal renders
+        this.initCropScale();
       };
       reader.readAsDataURL(file);
       event.target.value = '';
     },
 
     initCropScale() {
-      const img = document.getElementById('crop-img');
-      if (!img) return;
-      const vp = document.getElementById('crop-viewport');
-      if (!vp) return;
-      const vpSize = vp.offsetWidth; // square
-      const nw = img.naturalWidth;
-      const nh = img.naturalHeight;
-      if (!nw || !nh) return;
-      // Cover-fit: short side = vpSize
-      const scale = Math.max(vpSize / nw, vpSize / nh);
-      const iw = nw * scale;
-      const ih = nh * scale;
-      this.cropImgW = iw;
-      this.cropImgH = ih;
-      // Center image in viewport
-      this.cropX = (vpSize - iw) / 2;
-      this.cropY = (vpSize - ih) / 2;
+      // Canvas-based crop — called after cropSrc is set
+      this.$nextTick(() => setTimeout(() => this._initCropCanvas(), 60));
     },
 
-    cropTouchStart(e) {
-      if (e.touches.length === 1) {
-        this.cropDragStart = {
-          tx: e.touches[0].clientX, ty: e.touches[0].clientY,
-          ix: this.cropX, iy: this.cropY,
-          dist: null, iw: this.cropImgW, ih: this.cropImgH
-        };
-      } else if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        this.cropDragStart = {
-          tx: 0, ty: 0, ix: this.cropX, iy: this.cropY,
-          dist: Math.hypot(dx, dy), iw: this.cropImgW, ih: this.cropImgH
-        };
-      }
-    },
+    _initCropCanvas() {
+      const canvas = document.getElementById('crop-canvas');
+      if (!canvas) return;
 
-    cropTouchMove(e) {
-      if (!this.cropDragStart) return;
-      const vp = document.getElementById('crop-viewport');
-      const vpSize = vp ? vp.offsetWidth : 300;
+      const SIZE = Math.min(window.innerWidth, window.innerHeight - 140);
+      canvas.width  = SIZE;
+      canvas.height = SIZE;
+      canvas.style.width  = SIZE + 'px';
+      canvas.style.height = SIZE + 'px';
 
-      if (e.touches.length === 1 && this.cropDragStart.dist === null) {
-        const dx = e.touches[0].clientX - this.cropDragStart.tx;
-        const dy = e.touches[0].clientY - this.cropDragStart.ty;
-        this.cropX = this.clampCropX(this.cropDragStart.ix + dx, this.cropImgW, vpSize);
-        this.cropY = this.clampCropY(this.cropDragStart.iy + dy, this.cropImgH, vpSize);
-      } else if (e.touches.length === 2 && this.cropDragStart.dist) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const newDist = Math.hypot(dx, dy);
-        const ratio = newDist / this.cropDragStart.dist;
-        const minScale = Math.max(vpSize / (this.cropDragStart.iw / (this.cropDragStart.iw / vpSize)),
-                                  vpSize / (this.cropDragStart.ih / (this.cropDragStart.ih / vpSize)));
-        const newW = Math.max(vpSize, this.cropDragStart.iw * ratio);
-        const newH = Math.max(vpSize, this.cropDragStart.ih * ratio);
-        this.cropImgW = newW;
-        this.cropImgH = newH;
-        this.cropX = this.clampCropX(this.cropDragStart.ix, newW, vpSize);
-        this.cropY = this.clampCropY(this.cropDragStart.iy, newH, vpSize);
-      }
-    },
-
-    clampCropX(x, imgW, vpSize) {
-      if (imgW <= vpSize) {
-        // image smaller than viewport: allow free movement within viewport bounds
-        return Math.min(0, Math.max(vpSize - imgW, x));
-      }
-      // image larger than viewport: keep it covering the viewport
-      return Math.min(0, Math.max(vpSize - imgW, x));
-    },
-    clampCropY(y, imgH, vpSize) {
-      if (imgH <= vpSize) {
-        return Math.min(0, Math.max(vpSize - imgH, y));
-      }
-      return Math.min(0, Math.max(vpSize - imgH, y));
-    },
-
-    cropMouseDown(e) {
-      const startX = e.clientX - this.cropX;
-      const startY = e.clientY - this.cropY;
-      const vp = document.getElementById('crop-viewport');
-      const vpSize = vp ? vp.offsetWidth : 300;
-      const onMove = (ev) => {
-        this.cropX = this.clampCropX(ev.clientX - startX, this.cropImgW, vpSize);
-        this.cropY = this.clampCropY(ev.clientY - startY, this.cropImgH, vpSize);
+      const img = new Image();
+      img.onload = () => {
+        this._cropImg = img;
+        // Cover-fit: short side = SIZE
+        const scale = Math.max(SIZE / img.naturalWidth, SIZE / img.naturalHeight);
+        this._cw = img.naturalWidth  * scale;
+        this._ch = img.naturalHeight * scale;
+        // Center
+        this._cx = (SIZE - this._cw) / 2;
+        this._cy = (SIZE - this._ch) / 2;
+        this._cSize = SIZE;
+        this._drawCrop();
+        this._attachCropEvents(canvas);
       };
-      const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
+      img.src = this.cropSrc;
     },
+
+    _drawCrop() {
+      const canvas = document.getElementById('crop-canvas');
+      if (!canvas || !this._cropImg) return;
+      const S = this._cSize;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, S, S);
+      // Draw image
+      ctx.drawImage(this._cropImg, this._cx, this._cy, this._cw, this._ch);
+      // Dark overlay outside crop square (always the full canvas = crop square, so just draw guides)
+      // Corner brackets
+      const B = 28, T = 3;
+      ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+      ctx.lineWidth = T;
+      ctx.lineCap = 'round';
+      // top-left
+      ctx.beginPath(); ctx.moveTo(8+B,8); ctx.lineTo(8,8); ctx.lineTo(8,8+B); ctx.stroke();
+      // top-right
+      ctx.beginPath(); ctx.moveTo(S-8-B,8); ctx.lineTo(S-8,8); ctx.lineTo(S-8,8+B); ctx.stroke();
+      // bottom-left
+      ctx.beginPath(); ctx.moveTo(8+B,S-8); ctx.lineTo(8,S-8); ctx.lineTo(8,S-8-B); ctx.stroke();
+      // bottom-right
+      ctx.beginPath(); ctx.moveTo(S-8-B,S-8); ctx.lineTo(S-8,S-8); ctx.lineTo(S-8,S-8-B); ctx.stroke();
+    },
+
+    _attachCropEvents(canvas) {
+      // Remove previous
+      if (this._cropCleanup) this._cropCleanup();
+
+      let lastTouches = null;
+
+      const onTouchStart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        lastTouches = Array.from(e.touches).map(t => ({ x: t.clientX, y: t.clientY }));
+        this._cropStartCx = this._cx;
+        this._cropStartCy = this._cy;
+        this._cropStartCw = this._cw;
+        this._cropStartCh = this._ch;
+        if (e.touches.length === 2) {
+          this._cropStartDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+        }
+      };
+
+      const onTouchMove = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const S = this._cSize;
+
+        if (e.touches.length === 1) {
+          const dx = e.touches[0].clientX - lastTouches[0].x;
+          const dy = e.touches[0].clientY - lastTouches[0].y;
+          this._cx = this._clamp(this._cropStartCx + dx, this._cw, S);
+          this._cy = this._clamp(this._cropStartCy + dy, this._ch, S);
+        } else if (e.touches.length === 2) {
+          const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          const ratio = dist / this._cropStartDist;
+          const newW = Math.max(S, this._cropStartCw * ratio);
+          const newH = this._cropStartCh * (newW / this._cropStartCw);
+          // Zoom toward center of pinch
+          const pinchX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const pinchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          const rect = canvas.getBoundingClientRect();
+          const px = pinchX - rect.left;
+          const py = pinchY - rect.top;
+          const imgPx = (px - this._cropStartCx) / this._cropStartCw;
+          const imgPy = (py - this._cropStartCy) / this._cropStartCh;
+          this._cw = newW;
+          this._ch = newH;
+          this._cx = this._clamp(px - imgPx * newW, newW, S);
+          this._cy = this._clamp(py - imgPy * newH, newH, S);
+        }
+        this._drawCrop();
+      };
+
+      const onTouchEnd = (e) => {
+        if (e.touches.length < 2) {
+          lastTouches = Array.from(e.touches).map(t => ({ x: t.clientX, y: t.clientY }));
+          this._cropStartCx = this._cx;
+          this._cropStartCy = this._cy;
+        }
+      };
+
+      // Mouse support
+      let mouseDown = false, msx = 0, msy = 0;
+      const onMouseDown = (e) => {
+        mouseDown = true;
+        msx = e.clientX - this._cx;
+        msy = e.clientY - this._cy;
+      };
+      const onMouseMove = (e) => {
+        if (!mouseDown) return;
+        const S = this._cSize;
+        this._cx = this._clamp(e.clientX - msx, this._cw, S);
+        this._cy = this._clamp(e.clientY - msy, this._ch, S);
+        this._drawCrop();
+      };
+      const onMouseUp = () => { mouseDown = false; };
+
+      canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+      canvas.addEventListener('touchmove',  onTouchMove,  { passive: false });
+      canvas.addEventListener('touchend',   onTouchEnd,   { passive: false });
+      canvas.addEventListener('mousedown',  onMouseDown);
+      window.addEventListener('mousemove',  onMouseMove);
+      window.addEventListener('mouseup',    onMouseUp);
+
+      this._cropCleanup = () => {
+        canvas.removeEventListener('touchstart', onTouchStart);
+        canvas.removeEventListener('touchmove',  onTouchMove);
+        canvas.removeEventListener('touchend',   onTouchEnd);
+        canvas.removeEventListener('mousedown',  onMouseDown);
+        window.removeEventListener('mousemove',  onMouseMove);
+        window.removeEventListener('mouseup',    onMouseUp);
+      };
+    },
+
+    _clamp(pos, imgSize, viewSize) {
+      // image must cover viewport: pos ≤ 0 and pos + imgSize ≥ viewSize
+      if (imgSize <= viewSize) return (viewSize - imgSize) / 2; // center if smaller
+      return Math.min(0, Math.max(viewSize - imgSize, pos));
+    },
+
+    // Not used in canvas version but kept for safety
+    cropTouchStart() {}, cropTouchMove() {}, cropMouseDown() {},
+    clampCropX(x,w,s) { return this._clamp(x,w,s); },
+    clampCropY(y,h,s) { return this._clamp(y,h,s); },
 
     confirmCrop() {
-      const img = document.getElementById('crop-img');
-      const vp  = document.getElementById('crop-viewport');
-      if (!img || !vp) return;
-
-      const vpSize = vp.offsetWidth;   // square viewport size in CSS px
-      const nw = img.naturalWidth;
-      const nh = img.naturalHeight;
-
-      // cropX/cropY are the img's CSS px offset within the viewport
-      // cropImgW/H are the img's CSS px rendered dimensions
-      // We need to map viewport square (0,0,vpSize,vpSize) back to source image coords
-      const scaleX = nw / this.cropImgW;  // source px per CSS px
-      const scaleY = nh / this.cropImgH;
-
-      const sx = (-this.cropX) * scaleX;
-      const sy = (-this.cropY) * scaleY;
-      const sw = vpSize * scaleX;
-      const sh = vpSize * scaleY;
-
+      if (!this._cropImg) return;
+      const S = this._cSize;
+      const nw = this._cropImg.naturalWidth;
+      const nh = this._cropImg.naturalHeight;
+      // Map canvas crop area back to source image coords
+      const scaleX = nw / this._cw;
+      const scaleY = nh / this._ch;
+      const sx = (-this._cx) * scaleX;
+      const sy = (-this._cy) * scaleY;
+      const sw = S * scaleX;
+      const sh = S * scaleY;
       const OUT = 600;
-      const canvas = document.createElement('canvas');
-      canvas.width = OUT; canvas.height = OUT;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, OUT, OUT);
-
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      this.checkinData[this.cropFieldId] = dataUrl;
+      const out = document.createElement('canvas');
+      out.width = OUT; out.height = OUT;
+      out.getContext('2d').drawImage(this._cropImg, sx, sy, sw, sh, 0, 0, OUT, OUT);
+      this.checkinData[this.cropFieldId] = out.toDataURL('image/jpeg', 0.85);
+      if (this._cropCleanup) { this._cropCleanup(); this._cropCleanup = null; }
+      this._cropImg = null;
       this.modal = this.cropPrevModal;
       this.cropSrc = null;
       this.cropFieldId = null;
     },
 
     cancelCrop() {
+      if (this._cropCleanup) { this._cropCleanup(); this._cropCleanup = null; }
+      this._cropImg = null;
       this.modal = this.cropPrevModal;
       this.cropSrc = null;
       this.cropFieldId = null;
